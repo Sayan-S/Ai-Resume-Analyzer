@@ -5,7 +5,7 @@ from providers import ask_openai, ask_gemini
 
 st.set_page_config(page_title="AI Resume Analyzer & ATS Scorer", page_icon="📄", layout="centered")
 
-st.title("📄 AI Resume Analyzer & Job Matcher")
+st.title("📄 AI Resume Analyzer ")
 st.markdown("Upload a candidate resume and paste the job description to get an automated ATS match score and analysis.")
 
 # 1. Resume Upload (Top)
