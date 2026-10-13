@@ -1,45 +1,64 @@
 import streamlit as st
+from pypdf import PdfReader
 import config
 from providers import ask_openai, ask_gemini
 
-# Page setup
-st.set_page_config(page_title="Multi-LLM Assistant", page_icon="🤖", layout="centered")
-st.title("🤖 Multi-LLM Chatbot")
+st.set_page_config(page_title="AI Resume Analyzer & ATS Scorer", page_icon="📄", layout="wide")
 
-# Display current settings in the sidebar
-st.sidebar.title("Configuration")
-st.sidebar.write(f"**Provider:** `{config.PROVIDER}`")
-active_model = config.OPENAI_MODEL if config.PROVIDER == "openai" else config.GEMINI_MODEL
-st.sidebar.write(f"**Model:** `{active_model}`")
+st.title("📄 AI Resume Analyzer & Job Matcher")
+st.markdown("Upload a candidate resume and paste the job description to get an automated ATS match score and analysis.")
 
-# Store conversation history in session state
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+col1, col2 = st.columns(2)
 
-# Display previous chat messages
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+with col1:
+    uploaded_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
+    resume_text = ""
+    if uploaded_file is not None:
+        try:
+            reader = PdfReader(uploaded_file)
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    resume_text += text
+            st.success("Resume uploaded and parsed successfully!")
+        except Exception as e:
+            st.error(f"Error reading PDF: {e}")
 
-# User chat input
-if prompt := st.chat_input("Type your message here..."):
-    # Render user prompt
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+with col2:
+    job_desc = st.text_area("Paste Job Description (JD)", height=220, placeholder="Paste the target job description or core skills here...")
 
-    # Generate model response
-    with st.chat_message("assistant"):
-        with st.spinner("Generating answer..."):
+if st.button("Analyze Resume", type="primary"):
+    if not resume_text:
+        st.warning("Please upload a valid PDF resume first.")
+    elif not job_desc.strip():
+        st.warning("Please provide a job description to evaluate against.")
+    else:
+        with st.spinner("Analyzing match score and evaluating qualifications..."):
+            prompt = f"""
+You are an expert HR Talent Acquisition Specialist and ATS evaluation system.
+Evaluate the candidate's resume against the provided Job Description (JD).
+
+### Candidate Resume:
+{resume_text}
+
+### Target Job Description:
+{job_desc}
+
+Provide your analysis in the following structured format:
+1. **Overall Match Percentage**: (e.g., 85/100) with a 2-sentence rationale.
+2. **Key Strengths & Relevant Experience**: Bullet points highlighting matching qualifications.
+3. **Missing Skills / Keyword Gaps**: Specific tools, skills, or requirements in the JD not found in the resume.
+4. **Actionable Recommendations**: Clear, specific suggestions to tailor the resume for this position.
+"""
             try:
                 if config.PROVIDER == "openai":
-                    response = ask_openai(prompt)
+                    analysis = ask_openai(prompt)
                 elif config.PROVIDER == "gemini":
-                    response = ask_gemini(prompt)
+                    analysis = ask_gemini(prompt)
                 else:
-                    response = "Ollama requires a local GPU server and is not available on cloud hosting."
-                
-                st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+                    analysis = "Ollama is running locally and cannot be reached from the cloud."
+
+                st.subheader("Analysis Results")
+                st.markdown(analysis)
             except Exception as err:
-                st.error(f"Error communicating with provider: {err}")
+                st.error(f"Analysis failed: {err}")
